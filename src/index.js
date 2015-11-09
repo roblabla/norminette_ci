@@ -39,7 +39,7 @@ const process_pr = async function process_pr(repo_name, repo_url, pr_number, has
   }
   let ignorestr = "";
   try {
-    ignorestr = await promisify(::fs.readFile)(path.join(cwd, '.norminette_ignore'));
+    ignorestr = await promisify(::fs.readFile)(path.join(cwd, '.norminette_ignore'), 'utf8');
   } catch (e) {
     // Do nothing, maybe .gitignore doesn't exist :D
   }
