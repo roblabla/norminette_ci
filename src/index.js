@@ -25,12 +25,18 @@ const process_pr = async function process_pr(repo_name, repo_url, pr_number, has
   var cloneFolder = path.join(os.tmpdir(), `norminette_ci_${uuid.v4()}`);
   await mkdirp(cloneFolder);
   process.chdir(cloneFolder);
-  await exec('git', ['init']);
-  await exec('git', ('remote add origin ' + repo_url).split(" "));
-  await exec('git', ('fetch origin pull/' + pr_number + '/head:pr-' + pr_number).split(' '));
-  await exec('git', ('checkout pr-' + pr_number).split(' '));
-  await exec('git', ('submodule init').split(' '));
-  await exec('git', ('submodule update --init --recursive').split(' '));
+  try {
+    await exec('git', ['init']);
+    await exec('git', ('remote add origin ' + repo_url).split(" "));
+    await exec('git', ('fetch origin pull/' + pr_number + '/head:pr-' + pr_number).split(' '));
+    await exec('git', ('checkout pr-' + pr_number).split(' '));
+    await exec('git', ('submodule init').split(' '));
+    await exec('git', ('submodule update --init --recursive').split(' '));
+  } catch (e) {
+    console.error(e.stdout);
+    console.error(e.stderr);
+    throw e;
+  }
   let ignore = [];
   try {
     ignore = await new Promise((resolve, reject) => {
