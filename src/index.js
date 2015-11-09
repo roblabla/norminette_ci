@@ -3,6 +3,7 @@
 var express = require('express');
 var child_process = require('child_process');
 var exec = require('teen_process').exec;
+var fs = require('fs');
 var os = require('os');
 var path = require('path');
 var uuid = require('uuid');
@@ -30,7 +31,18 @@ const process_pr = async function process_pr(repo_name, repo_url, pr_number, has
   await exec('git', ('checkout pr-' + pr_number).split(' '));
   await exec('git', ('submodule init').split(' '));
   await exec('git', ('submodule update --init --recursive').split(' '));
-  var files = await glob('**/*.c');
+  let ignore = [];
+  try {
+    ignore = await new Promise((resolve, reject) => {
+      _(fs.createReadStream(".norminette_ignore"))
+        .split()
+        .stopOnError(reject)
+        .toArray(resolve);
+    });
+  } catch (e) {
+    // Do nothing, maybe .gitignore doesn't exist :D
+  }
+  var files = await glob('**/*.c', { ignore });
   var child = child_process.spawn(`norminette`, files, {
     stdio: [0, 'pipe', 'pipe']
   });
@@ -41,11 +53,9 @@ const process_pr = async function process_pr(repo_name, repo_url, pr_number, has
       str += line + "\n";
       if (line !== "" && !line.startsWith("Norme"))
         x = false;
-    }).stopOnError((err) => {
-      reject(err);
-    }).done(() => {
-      resolve([x, str]);
-    });
+    })
+    .stopOnError(reject)
+    .done(() => resolve([x, str]));
   });
   var [data, headers] = await promisify(::(octonode.gist().create), { multiArgs: true })({
     description: "Norminette check",
