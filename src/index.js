@@ -36,18 +36,14 @@ const process_pr = async function process_pr(repo_name, repo_url, pr_number, has
     console.error(e.stderr);
     throw e;
   }
-  let ignore = [];
+  let ignorestr = "";
   try {
-    ignore = await new Promise((resolve, reject) => {
-      _(fs.createReadStream(".norminette_ignore"))
-        .split()
-        .stopOnError(reject)
-        .toArray(resolve);
-    });
+    ignorestr = await promisify(::fs.readFile)(path.join(cwd, '.norminette_ignore'));
   } catch (e) {
     // Do nothing, maybe .gitignore doesn't exist :D
   }
-  var files = await glob('**/*.c', { ignore, cwd });
+  let gitignore = gitignore_parser.compile(ignorestr);
+  var files = gitignore.filter(await glob('**/*.c', { cwd }));
   var child = child_process.spawn(`norminette`, files, {
     cwd,
     stdio: [0, 'pipe', 'pipe']
