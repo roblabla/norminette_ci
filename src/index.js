@@ -22,16 +22,15 @@ const process_pr = async function process_pr(repo_name, repo_url, pr_number, has
     description: "Norme",
     context: "norminette"
   });
-  var cloneFolder = path.join(os.tmpdir(), `norminette_ci_${uuid.v4()}`);
-  await mkdirp(cloneFolder);
-  process.chdir(cloneFolder);
+  var cwd = path.join(os.tmpdir(), `norminette_ci_${uuid.v4()}`);
+  await mkdirp(cwd);
   try {
-    await exec('git', ['init']);
-    await exec('git', ('remote add origin ' + repo_url).split(" "));
-    await exec('git', ('fetch origin pull/' + pr_number + '/head:pr-' + pr_number).split(' '));
-    await exec('git', ('checkout pr-' + pr_number).split(' '));
-    await exec('git', ('submodule init').split(' '));
-    await exec('git', ('submodule update --init --recursive').split(' '));
+    await exec('git', ('init').split(" "), { cwd });
+    await exec('git', ('remote add origin ' + repo_url).split(" "), { cwd });
+    await exec('git', ('fetch origin pull/' + pr_number + '/head:pr-' + pr_number).split(' '), { cwd });
+    await exec('git', ('checkout pr-' + pr_number).split(' '), { cwd });
+    await exec('git', ('submodule init').split(' '), { cwd });
+    await exec('git', ('submodule update --init --recursive').split(' '), { cwd });
   } catch (e) {
     console.error(e.stdout);
     console.error(e.stderr);
@@ -48,8 +47,9 @@ const process_pr = async function process_pr(repo_name, repo_url, pr_number, has
   } catch (e) {
     // Do nothing, maybe .gitignore doesn't exist :D
   }
-  var files = await glob('**/*.c', { ignore });
+  var files = await glob('**/*.c', { ignore, cwd });
   var child = child_process.spawn(`norminette`, files, {
+    cwd,
     stdio: [0, 'pipe', 'pipe']
   });
   let [success, result] = await new Promise((resolve, reject) => {
