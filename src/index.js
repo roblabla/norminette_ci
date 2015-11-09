@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 var express = require('express');
 var child_process = require('child_process');
 var exec = require('teen_process').exec;
@@ -26,6 +28,8 @@ const process_pr = async function process_pr(repo_name, repo_url, pr_number, has
   await exec('git', ('remote add origin ' + repo_url).split(" "));
   await exec('git', ('fetch origin pull/' + pr_number + '/head:pr-' + pr_number).split(' '));
   await exec('git', ('checkout pr-' + pr_number).split(' '));
+  await exec('git', ('submodule init').split(' '));
+  await exec('git', ('submodule update --init --recursive').split(' '));
   var files = await glob('**/*.c');
   var child = child_process.spawn(`norminette`, files, {
     stdio: [0, 'pipe', 'pipe']
