@@ -9,6 +9,7 @@ var path = require('path');
 var uuid = require('uuid');
 var promisify = require('pify');
 var mkdirp = promisify(require('mkdirp'));
+var gitignore_parser = require('gitignore-parser');
 var octonode = require('octonode').client(process.env.GITHUB_API_KEY);
 var glob = promisify(require('glob'));
 var _ = require('highland');
