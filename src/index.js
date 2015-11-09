@@ -44,7 +44,7 @@ const process_pr = async function process_pr(repo_name, repo_url, pr_number, has
     // Do nothing, maybe .gitignore doesn't exist :D
   }
   let gitignore = gitignore_parser.compile(ignorestr);
-  var files = gitignore.filter(await glob('**/*.c', { cwd }));
+  var files = (await glob('**/*.c', { cwd })).filter(gitignore.accepts);
   var child = child_process.spawn(`norminette`, files, {
     cwd,
     stdio: [0, 'pipe', 'pipe']
