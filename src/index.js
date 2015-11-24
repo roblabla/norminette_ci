@@ -1,29 +1,27 @@
-#!/usr/bin/env node
+//#!/usr/bin/env node
 
-var express = require('express');
-var child_process = require('child_process');
-var exec = require('teen_process').exec;
-var fs = require('fs');
-var os = require('os');
-var path = require('path');
-var uuid = require('uuid');
-var promisify = require('pify');
-var mkdirp = promisify(require('mkdirp'));
-var gitignore_parser = require('gitignore-parser');
-var octonode = require('octonode').client(process.env.GITHUB_API_KEY);
-var glob = promisify(require('glob'));
-var _ = require('highland');
-var app = express();
+let express = require('express');
+let child_process = require('child_process');
+let exec = require('teen_process').exec;
+let fs = require('fs-promise');
+let os = require('os');
+let path = require('path');
+let uuid = require('uuid');
+let promisify = require('pify');
+let mkdirp = promisify(require('mkdirp'));
+let gitignore_parser = require('gitignore-parser');
+let octonode = require('octonode').client(process.env.GITHUB_API_KEY);
+let glob = require('glob');
+let asyncIterator = require('./asyncIterator');
+let EventEmitterIterator = require('./EventEmitterIterator');
+let createNorminette = promisify(require('./norminette'));
+let app = express();
 
 app.use(require('morgan')('dev'));
 
-const process_pr = async function process_pr(repo_name, repo_url, pr_number, hash) {
-  await promisify(::(octonode.repo(repo_name).status))(hash, {
-    state: "pending",
-    description: "Norme",
-    context: "norminette"
-  });
+const process_pr = async function process_pr(repo_name, repo_url, pr_number) {
   var cwd = path.join(os.tmpdir(), `norminette_ci_${uuid.v4()}`);
+  let hash;
   await mkdirp(cwd);
   try {
     await exec('git', ('init').split(" "), { cwd });
@@ -32,35 +30,36 @@ const process_pr = async function process_pr(repo_name, repo_url, pr_number, has
     await exec('git', ('checkout pr-' + pr_number).split(' '), { cwd });
     await exec('git', ('submodule init').split(' '), { cwd });
     await exec('git', ('submodule update --init --recursive').split(' '), { cwd });
+    ({ stdout: hash } = await exec('git', ('rev-parse HEAD').split(' '), { cwd }));
   } catch (e) {
     console.error(e.stdout);
     console.error(e.stderr);
     throw e;
   }
+  await promisify(::(octonode.repo(repo_name).status))(hash, {
+    state: "pending",
+    description: "Norme",
+    context: "norminette"
+  });
   let ignorestr = "";
   try {
-    ignorestr = await promisify(::fs.readFile)(path.join(cwd, '.norminette_ignore'), 'utf8');
+    ignorestr = await fs.readFile(path.join(cwd, '.norminette_ignore'), 'utf8');
   } catch (e) {
     // Do nothing, maybe .gitignore doesn't exist :D
   }
   let gitignore = gitignore_parser.compile(ignorestr);
-  var files = (await glob('**/*.{c,h}', { cwd })).filter(gitignore.accepts);
-  var child = child_process.spawn(`norminette`, files, {
-    cwd,
-    stdio: [0, 'pipe', 'pipe']
-  });
-  let [success, result] = await new Promise((resolve, reject) => {
-    let x = true;
-    var str = "";
-    _(child.stdout).split().each((line) => {
-      str += line + "\n";
-      if (line !== "" && !line.startsWith("Norme"))
-        x = false;
-    })
-    .stopOnError(reject)
-    .done(() => resolve([x, str]));
-  });
-  var [data, headers] = await promisify(::(octonode.gist().create), { multiArgs: true })({
+  let norminette = await createNorminette();
+  let globber = new EventEmitterIterator(new glob.Glob('**/*.{c,h}', { cwd, nodir: true }), "match", "end");
+  let [result, success] = await (globber::asyncIterator.filter(async function(item) {
+    let accepts = gitignore.accepts(item[0]);
+    return accepts;
+  })::asyncIterator.map(async function(item) {
+    return await promisify(norminette.sendFile)(item[0], await fs.readFile(path.join(cwd, item[0])), null);
+  })::asyncIterator.reduce(async function([str, res], item) {
+    let display = item.display ? `\n${item.display}` : "";
+    return [`${str}\nNorme: ${item.filename}${display}`, res && !item.display];
+  }, ["", true]));
+  let [data, headers] = await promisify(::(octonode.gist().create), { multiArgs: true })({
     description: "Norminette check",
     public: true,
     files: {
@@ -73,10 +72,11 @@ const process_pr = async function process_pr(repo_name, repo_url, pr_number, has
     description: "Norme",
     context: "norminette"
   });
-  return data.html_url;
+  norminette.close();
+  /*return data.html_url;*/
 }
 
-app.post('/event_handler', require('body-parser').json(), function(req, res, next) {
+/*app.post('/event_handler', require('body-parser').json(), function(req, res, next) {
   if (req.get('X-GITHUB-EVENT') === 'pull_request' && (req.body.action === "opened" || req.body.action === "synchronize"))
   {
     process_pr(req.body.pull_request.base.repo.full_name,
@@ -90,8 +90,16 @@ app.post('/event_handler', require('body-parser').json(), function(req, res, nex
       return res.status(500).end();
     });
   }
-  else
-    return res.status(406).end();
+  else if (req.get('X-GITHUB-EVENT') === 'push') {
+
+  }
+  return res.status(406).end();
 });
 
-app.listen(9999);
+app.listen(9999);*/
+
+process_pr("roblabla42/RT", "https://github.com/roblabla42/RT.git", 13).then(function() {
+  console.log("done");
+}).catch(function(err) {
+  setImmediate(function() { throw err; });
+});
