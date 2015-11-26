@@ -1,9 +1,9 @@
 class EventEmitterIterator {
-  constructor (emitter, event, endEvent) {
+  constructor (emitter, { event = "data", endEvent = "end", multiArgs = false } = {}) {
     this.queue = [];
     this.cbqueue = [];
     let listener = (...args) => {
-      this.sendToQueue({ kind: "data", args });
+      this.sendToQueue({ kind: "data", args: multiArgs ? args : args[0] });
     };
     let endListener = () => {
       this.sendToQueue({ kind: "end" });
